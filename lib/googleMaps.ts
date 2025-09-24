@@ -23,6 +23,7 @@ export interface PlaceResult {
   photos?: Array<{
     photo_reference: string;
   }>;
+  price_level?: number;
 }
 
 export interface DirectionsResult {

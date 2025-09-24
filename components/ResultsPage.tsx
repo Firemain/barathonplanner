@@ -179,13 +179,7 @@ export default function ResultsPage() {
       {/* Main Content */}
       <div className="flex flex-col lg:flex-row min-h-[calc(100vh-80px)]">
         {/* Map Section */}
-        <div className="lg:w-1/2 h-[400px] lg:h-[calc(100vh-80px)]">
-          {console.log('=== PROPS ENVOYÉES À GoogleMap ===', {
-            barsCount: crawlData.bars.length,
-            routePolyline: crawlData.routePolyline?.substring(0, 50) + '...',
-            start,
-            end
-          })}
+        <div className="lg:w-1/2 h-[400px] lg:h-[calc(100vh-80px)]">     
           <GoogleMap
             bars={crawlData.bars}
             routePolyline={crawlData.routePolyline}
