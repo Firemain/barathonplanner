@@ -139,16 +139,17 @@ export default function ResultsPage() {
     <div className="min-h-screen">
       {/* Header */}
       <div className="bg-black/60 backdrop-blur-sm p-4 border-b border-purple-500/30">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+            <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
               Ton Barathon est prêt ! 🎉
             </h1>
             <p className="text-gray-400 text-sm">
               {crawlData.bars.length} bars • {crawlData.totalDistance} • {crawlData.totalDuration}
             </p>
           </div>
-          <div className="flex gap-2">
+
+          <div className="flex flex-wrap gap-2">
             <Button
               onClick={handleRegenerate}
               variant="outline"
