@@ -137,10 +137,9 @@ export default function LandingPage() {
                     onChange={(e) => setFormData(prev => ({ ...prev, mode: e.target.value }))}
                     className="w-full bg-gray-800 border-gray-600 text-white rounded px-3 py-2"
                   >
-                    <option value="shortest">Le plus court</option>
+                    <option value="shortest">Le plus optimisé</option>
                     <option value="rating">Meilleure note ⭐</option>
                     <option value="price">Le moins cher 💸</option>
-                    <option value="mixed">Équilibré (note/prix) ⚖️</option>
                   </select>
                 </div>
 

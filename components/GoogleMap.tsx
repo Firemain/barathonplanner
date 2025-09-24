@@ -44,6 +44,12 @@ export default function GoogleMap({ bars, routePolyline, start, end, selectedBar
     }
 
     loader.load().then(async () => {
+      // 🔥 Forcer l'import manuel si geometry n'est pas dispo
+      if (!google.maps.geometry?.encoding && (google.maps as any).importLibrary) {
+        console.log("⏳ Import manuel de la lib geometry...");
+        await (google.maps as any).importLibrary("geometry");
+      }
+
       console.log('geometry lib dispo ?', !!google.maps.geometry);
       console.log('encoding dispo ?', !!google.maps.geometry?.encoding);
     
