@@ -12,6 +12,7 @@ interface Bar {
   position: { lat: number; lng: number };
   estimatedArrivalTime: string;
   price_level?: number;
+  deviation?: number;
 }
 
 interface CrawlData {
@@ -48,6 +49,38 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Erreur lors de la génération du parcours' }, { status: 500 });
   }
 }
+
+function distancePointToPolyline(point: {lat:number,lng:number}, path: Array<{lat:number,lng:number}>) {
+  let minDist = Infinity;
+  for (let i = 0; i < path.length - 1; i++) {
+    const dist = distancePointToSegment(point, path[i], path[i+1]);
+    if (dist < minDist) minDist = dist;
+  }
+  return minDist;
+}
+
+function distancePointToSegment(p: {lat:number,lng:number}, a: {lat:number,lng:number}, b: {lat:number,lng:number}) {
+  const l2 = (a.lat - b.lat) ** 2 + (a.lng - b.lng) ** 2;
+  if (l2 === 0) return haversine(p, a);
+  let t = ((p.lat - a.lat) * (b.lat - a.lat) + (p.lng - a.lng) * (b.lng - a.lng)) / l2;
+  t = Math.max(0, Math.min(1, t));
+  const proj = { lat: a.lat + t * (b.lat - a.lat), lng: a.lng + t * (b.lng - a.lng) };
+  return haversine(p, proj);
+}
+
+function projectionIndex(point: {lat:number,lng:number}, path: Array<{lat:number,lng:number}>) {
+  let bestIndex = 0;
+  let bestDist = Infinity;
+  for (let i = 0; i < path.length; i++) {
+    const d = haversine(point, path[i]);
+    if (d < bestDist) {
+      bestDist = d;
+      bestIndex = i;
+    }
+  }
+  return bestIndex;
+}
+
 
 // 🔥 Score pondéré (note + nb d’avis)
 function weightedRating(rating: number, votes: number, m = 50) {
@@ -91,6 +124,32 @@ function isDuplicateBar(bars: Bar[], candidate: { id: string; position: { lat: n
   return bars.some(b => haversine(b.position, candidate.position) < 60);
 }
 
+function resamplePath(path: Array<{ lat: number; lng: number }>, interval = 100) {
+  if (path.length < 2) return path;
+
+  const resampled: Array<{ lat: number; lng: number }> = [];
+  let remaining = 0;
+
+  for (let i = 0; i < path.length - 1; i++) {
+    const a = path[i];
+    const b = path[i + 1];
+    const segmentLength = haversine(a, b);
+
+    let dist = remaining;
+    while (dist < segmentLength) {
+      const t = dist / segmentLength;
+      const lat = a.lat + (b.lat - a.lat) * t;
+      const lng = a.lng + (b.lng - a.lng) * t;
+      resampled.push({ lat, lng });
+      dist += interval;
+    }
+    remaining = dist - segmentLength; // reste pour le segment suivant
+  }
+
+  resampled.push(path[path.length - 1]); // dernier point
+  return resampled;
+}
+
 async function generateRealCrawlData(
   start: string,
   end: string,
@@ -110,7 +169,7 @@ async function generateRealCrawlData(
   let route: any;
 
   // 🚀 Mode "shortest" → bars le long du trajet le plus court
-  if (mode === 'shortest') {
+ if (mode === 'shortest') {
     console.log('Mode shortest activé');
     const directRoute = await mapsService.getDirections(start, end, []);
     if (!directRoute) throw new Error("Impossible de calculer l'itinéraire direct");
@@ -126,29 +185,28 @@ async function generateRealCrawlData(
     
     if (decodedPath.length === 0) {
       console.log('Aucun point décodé, fallback vers mode rating');
-      // Fallback vers le mode rating si le décodage échoue
       return generateRealCrawlData(start, end, barsCount, startTime, apiKey, 'rating');
     }
     
     // Échantillonnage intelligent des points
-    const step = Math.max(1, Math.floor(decodedPath.length / (barsCount * 3)));
-    const samplePoints = decodedPath.filter((_, i) => i % step === 0);
+    // Un point tous les 100 m
+    const samplePoints = resamplePath(decodedPath, 100);
+    console.log('Points échantillonnés (100m):', samplePoints.length);
+
     console.log('Points échantillonnés:', samplePoints.length);
 
     for (const point of samplePoints) {
-      if (bars.length >= barsCount) break;
+      if (bars.length >= barsCount * 3) break; // on prend un peu plus large au départ
       
       console.log(`Recherche bars près de ${point.lat}, ${point.lng}`);
       const nearby = await mapsService.findNearbyBars(point.lat, point.lng, 300);
       if (!nearby?.length) continue;
       
-      console.log(`Trouvé ${nearby.length} bars à proximité`);
-
       const sorted = nearby
         .map(n => ({ n, score: scoreBar(n, 'rating') }))
         .sort((a, b) => b.score - a.score);
 
-      for (const s of sorted.slice(0, 3)) { // Limite à 3 meilleurs pour éviter trop d'appels API
+      for (const s of sorted.slice(0, 10)) {
         const d = await mapsService.getPlaceDetails(s.n.place_id);
         if (!d) continue;
         
@@ -173,17 +231,32 @@ async function generateRealCrawlData(
         
         if (!isDuplicateBar(bars, candidate)) {
           bars.push(candidate);
-          console.log(`Bar ajouté: ${candidate.name}`);
-          break;
         }
       }
     }
     
-    console.log(`Mode shortest: ${bars.length} bars trouvés`);
-    
-    // 🔥 IMPORTANT: Recalculer l'itinéraire avec les bars trouvés
+    console.log(`Bars candidats collectés: ${bars.length}`);
+
+    // 🔥 Étape 1 : filtrer ceux trop loin du chemin
+    bars = bars.map(b => ({
+      ...b,
+      deviation: distancePointToPolyline(b.position, decodedPath)
+    }));
+    bars = bars.filter(b => typeof b.deviation === 'number' && b.deviation < 300); // 300 m max
+
+    // 🔥 Étape 2 : ordonner par projection le long du chemin
+    bars.sort((a, b) => {
+      const pa = projectionIndex(a.position, decodedPath);
+      const pb = projectionIndex(b.position, decodedPath);
+      return pa - pb;
+    });
+
+    // 🔥 Étape 3 : limiter au nombre demandé
+    bars = bars.slice(0, barsCount);
+    console.log(`Mode shortest: ${bars.length} bars retenus après filtrage/tri`);
+
+    // Recalcul itinéraire final
     if (bars.length > 0) {
-      console.log('Recalcul de l\'itinéraire avec les bars trouvés...');
       const waypointsForDirections = bars.map(bar => ({
         location: `${bar.position.lat},${bar.position.lng}`,
         stopover: true,
@@ -194,11 +267,6 @@ async function generateRealCrawlData(
         route = finalDirections.routes[0];
         polyline = route.overview_polyline.points;
         console.log('✅ Itinéraire final recalculé, nouvelle polyline longueur:', polyline.length);
-        
-        // Réorganiser les bars selon l'ordre optimisé par Google
-        const order: number[] = (route as any).waypoint_order || bars.map((_, i) => i);
-        bars = order.map(i => bars[i]);
-        console.log('✅ Bars réorganisés selon l\'ordre optimal');
       } else {
         console.log('⚠️ Impossible de recalculer l\'itinéraire final, garde la polyline directe');
       }

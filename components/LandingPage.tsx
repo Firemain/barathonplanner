@@ -5,11 +5,13 @@ import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import LocationInput from '@/components/LocationInput';
 import TimeInput from '@/components/TimeInput';
 import { MapPin, Clock, Users } from 'lucide-react';
+import TimePicker from 'react-time-picker';
 
 export default function LandingPage() {
   const router = useRouter();
@@ -44,6 +46,7 @@ export default function LandingPage() {
   };
 
   const isFormValid = formData.start && formData.end && formData.start !== formData.end;
+  // const times = Array.from({ length: 12 }, (_, i) => `${(20 + i) % 24}:00`)
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
@@ -116,18 +119,37 @@ export default function LandingPage() {
                     <span>10 bars</span>
                   </div>
                 </div>
-
-                <div>
-                  <Label htmlFor="startTime" className="text-white flex items-center gap-2 mb-2">
+                {/* <div>
+                  <Label className="text-white flex items-center gap-2 mb-2">
                     <Clock className="w-4 h-4 text-yellow-400" />
-                    Heure de début
+                    Heure de départ
                   </Label>
-                  <TimeInput
-                    value={formData.startTime}
-                    onChange={(value) => setFormData(prev => ({ ...prev, startTime: value }))}
-                    className="bg-gray-800 border-gray-600 text-white"
-                  />
-                </div>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-between bg-gray-800 border-gray-600 text-white"
+                      >
+                        {formData.startTime || "Choisis une heure"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[200px] p-0 bg-black/90 text-white border-gray-700">
+                      <div className="max-h-60 overflow-y-auto">
+                        {times.map((time) => (
+                          <button
+                            key={time}
+                            className={`w-full px-4 py-2 text-left hover:bg-purple-600/30 ${
+                              formData.startTime === time ? "bg-purple-600/50" : ""
+                            }`}
+                            onClick={() => setFormData(prev => ({ ...prev, startTime: time }))}
+                          >
+                            {time}
+                          </button>
+                        ))}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div> */}
                 <div>
                   <Label className="text-white flex items-center gap-2 mb-2">
                     Mode de sélection des bars
