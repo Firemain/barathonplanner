@@ -189,9 +189,9 @@ async function generateRealCrawlData(
     }
     
     // Échantillonnage intelligent des points
-    // Un point tous les 100 m
-    const samplePoints = resamplePath(decodedPath, 100);
-    console.log('Points échantillonnés (100m):', samplePoints.length);
+    // Un point tous les 200 m
+    const samplePoints = resamplePath(decodedPath, 200);
+    console.log('Points échantillonnés (200m):', samplePoints.length);
 
     console.log('Points échantillonnés:', samplePoints.length);
 
@@ -199,7 +199,7 @@ async function generateRealCrawlData(
       if (bars.length >= barsCount * 3) break; // on prend un peu plus large au départ
       
       console.log(`Recherche bars près de ${point.lat}, ${point.lng}`);
-      const nearby = await mapsService.findNearbyBars(point.lat, point.lng, 300);
+      const nearby = await mapsService.findNearbyBars(point.lat, point.lng, 150);
       if (!nearby?.length) continue;
       
       const sorted = nearby
@@ -242,7 +242,7 @@ async function generateRealCrawlData(
       ...b,
       deviation: distancePointToPolyline(b.position, decodedPath)
     }));
-    bars = bars.filter(b => typeof b.deviation === 'number' && b.deviation < 300); // 300 m max
+    bars = bars.filter(b => typeof b.deviation === 'number' && b.deviation < 150); // 300 m max
 
     // 🔥 Étape 2 : ordonner par projection le long du chemin
     bars.sort((a, b) => {
